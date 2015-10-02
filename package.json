@@ -1,0 +1,11 @@
+{
+  "name": "converto-bot",
+  "version": "0.0.1",
+  "dependencies": {
+    "body-parser": "^1.14.1",
+    "express": "^4.13.3",
+    "log": "^1.4.0",
+    "multer": "^1.0.5",
+    "slack-client": "^1.4.1"
+  }
+}
