@@ -6,6 +6,7 @@
     "express": "^4.13.3",
     "log": "^1.4.0",
     "multer": "^1.0.5",
-    "slack-client": "^1.4.1"
+    "slack-client": "^1.4.1",
+    "wolfram": "^0.3.2"
   }
 }
