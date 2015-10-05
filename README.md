@@ -2,12 +2,12 @@
 Convbot integrates WolframAlpha into Slack.
 
 ## Features
- * Automatically converts units enclosed in `
+ * Automatically converts units enclosed in `` ` ``
     * Try ``My car is `3 meters` long``
- * Queries WolframAlpha with `=<query>`
+ * Queries WolframAlpha with `` `=<query>` ``
     *This will only show the primary pod of the WolframAlpha result, to not spam the channel.
     * Try `` `=image of obama` ``
- * Shows all the pods WolframAlpha gives us when you use =+
+ * Shows all the pods WolframAlpha gives us when you use `` `=+<query>` ``
     * Try `` `=+solve (x*8 + 3) = 0` ``
  * Slash-Command /convert
     * `/convert <unit expression>` converts metric to imperial or vice versa in the same style the ` unit expression would
@@ -25,7 +25,8 @@ Convbot integrates WolframAlpha into Slack.
      3. Wolfram API token
      4. cloudinary API key, secret and app name
  4. Set the port you want the internal webserver to listen on for incoming slash commands. 
-    **To set the URL in Slack**
+ 
+    **To set the URL for slash command in Slack**
     
     If your domain is `example.com`, and your port is `3000`, the URL will be `http://example.com:3000/slackslash`
  5. Install necessary dependencies using `npm install`
