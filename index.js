@@ -229,7 +229,7 @@ webapp.post("/slackslash", function(req, res) {
         if (req.body.command == "/convert") {
             var match;
             let text = req.body.text;
-            var message = new Message({channel: req.body.channel_id});
+            var message = new Message({channel: req.body.channel_id}, slack);
             if (match = text.match(convertToSyntax)) {
                 simpleConvert(match[1], match[2], message);
             } else if (match = text.match(metricExpression)) {
