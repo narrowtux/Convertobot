@@ -17,8 +17,9 @@ let cloudinary = require("cloudinary");
 
 let metricCode = makeExpr(config.metric, "`");
 let imperialCode = makeExpr(config.imperial, "`");
-let metricExpression = makeExpr(config.metric, "");
-let imperialExpression = makeExpr(config.imperial, "");
+let metricExpression = _makeExpr(config.metric, "^", "$");
+let imperialExpression = _makeExpr(config.imperial, "^", "$");
+console.log(metricExpression);
 let convertToSyntax = /(.*) to (.*)/;
 
 let wolframAlphaQuery = /`=(\+?)([^\`]*)`/g;
@@ -30,7 +31,7 @@ cloudinary.config({
     api_secret: config.cloudinaryApiSecret
 });
 
-function extracted(units, prefix, suffix) {
+function _makeExpr(units, prefix, suffix) {
     var str = prefix + "([0-9/\\.]*\\s?(";
     for (var i = 0; i < units.length; i++) {
         str += units[i].replace(/\//, "\\/");
@@ -42,7 +43,7 @@ function extracted(units, prefix, suffix) {
     return new RegExp(str, "g");
 }
 function makeExpr(units, fence) {
-    return extracted(units, fence, fence);
+    return _makeExpr(units, fence, fence);
 }
 
 
@@ -171,19 +172,19 @@ slack.on("open", function() {
 });
 
 slack.on("message", function(message) {
-    var res = metricCode.exec(message.text);
+    let text = message.text;
+    if (!text) {
+        return;
+    }
+    var res = metricCode.exec(text);
     var channel = slack.getChannelByID(message.channel);
-    if (res) {
-        simpleConvert(res[1], "imperial", channel);
-    } else {
-        res = imperialCode.exec(message.text);
-        if (res) {
-            simpleConvert(res[1], "metric", channel);
-        } else {
-            res = wolframAlphaQuery.exec(message.text);
-            if (res && res[2] != "") {
-                wolframQuery(res[2], channel, res[1] == '+');
-            }
+    if (res = text.match(metricCode)) {
+        simpleConvert(res[0], "imperial", channel);
+    } else if (res = text.match(imperialCode)) {
+        simpleConvert(res[0], "metric", channel);
+    } else if (res = wolframAlphaQuery.exec(text)) {
+        if (res && res[2] != "") {
+            wolframQuery(res[2], channel, res[1] == '+');
         }
     }
 });
