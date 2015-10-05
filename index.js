@@ -21,7 +21,7 @@ let metricExpression = makeExpr(config.metric, "");
 let imperialExpression = makeExpr(config.imperial, "");
 let convertToSyntax = /(.*) to (.*)/;
 
-let wolframAlphaQuery = /`=(=?)(.*)`/g;
+let wolframAlphaQuery = /`=(\+?)([^\`]*)`/g;
 let webapp = express();
 
 cloudinary.config({
@@ -30,16 +30,19 @@ cloudinary.config({
     api_secret: config.cloudinaryApiSecret
 });
 
-function makeExpr(units, fence) {
-    var str = fence + "([0-9/\\.]*\\s?(";
+function extracted(units, prefix, suffix) {
+    var str = prefix + "([0-9/\\.]*\\s?(";
     for (var i = 0; i < units.length; i++) {
         str += units[i].replace(/\//, "\\/");
         if (i < units.length - 1) {
             str += "|";
         }
     }
-    str += "))" + fence;
+    str += "))" + suffix;
     return new RegExp(str, "g");
+}
+function makeExpr(units, fence) {
+    return extracted(units, fence, fence);
 }
 
 
@@ -51,13 +54,15 @@ function simpleConvert(origin, target, channel) {
     var msg = new Message({
         as_user: true,
         channel: channel.id,
-        text: origin + " = `Computing ...`"
+        text: origin + " = _Computing …_"
     }, slack);
 
     msg.send();
     wolfram.query("convert " + origin + " to " + target, function (err, result) {
-        if (!err) {
-            msg.text = origin + " = " + result.pod[1].subpod[0].plaintext[0];
+        if (!err && result && result.pod) {
+            var plaintext = result.pod[1].subpod[0].plaintext[0];
+            plaintext = plaintext.replace(/\(.+\)/, "");
+            msg.text = origin + " = " + plaintext;
             msg.update();
         } else {
             msg.text = "Does not compute";
@@ -78,12 +83,12 @@ function wolframQuery(query, channel, full) {
 
         atts.push({
             title: "Result",
-            text: "`Computing ...`",
+            text: "_Computing …_",
             mrkdwn_in: ["text"]
         });
     } else {
         atts.push({
-            text: "`Computing ...`",
+            text: "_Computing …_",
             mrkdwn_in: ["text"]
         });
     }
@@ -101,6 +106,7 @@ function wolframQuery(query, channel, full) {
                 attachment.color = "#F58120";
             }
             attachment.title = pod.$.title;
+            attachment.title_link = "http://www.wolframalpha.com/input/?i=" + encodeURIComponent(query);
             pod.subpod.forEach(function (subpod) {
                 attachment.image_url = subpod.img[0].$.src;
                 attachment.fallback = subpod.plaintext[0];
@@ -124,7 +130,7 @@ function wolframQuery(query, channel, full) {
             }
         }
 
-        if (!err && res) {
+        if (!err && res && res.pod) {
             var attachments = [];
             res.pod.forEach(function(pod) {
                 if (!full && !pod.$.primary) {
@@ -139,12 +145,6 @@ function wolframQuery(query, channel, full) {
                 msg.update();
                 return;
             }
-
-            attachments.push({
-                title: "Wolfram|Alpha",
-                title_link: "http://www.wolframalpha.com/input/?i=" + encodeURIComponent(query),
-                color: "#D40000"
-            });
 
             attachments.forEach(function (attachment) {
                 if (attachment.image_url) {
@@ -181,8 +181,8 @@ slack.on("message", function(message) {
             simpleConvert(res[1], "metric", channel);
         } else {
             res = wolframAlphaQuery.exec(message.text);
-            if (res) {
-                wolframQuery(res[2], channel, res[1] == '=');
+            if (res && res[2] != "") {
+                wolframQuery(res[2], channel, res[1] == '+');
             }
         }
     }
@@ -198,12 +198,13 @@ webapp.post("/slackslash", function(req, res) {
     if (req.body.token == config.slackSlashToken) {
         if (req.body.command == "/convert") {
             var match;
-            if (match = convertToSyntax.exec(req.body.text)) {
+            let text = req.body.text;
+            if (match = text.match(convertToSyntax)) {
                 simpleConvert(match[1], match[2], slack.getChannelByID(req.body.channel_id));
-            } else if (match = metricExpression.exec(req.body.text)) {
-                simpleConvert(match[1], "imperial", slack.getChannelByID(req.body.channel_id));
-            } else if (match = imperialExpression.exec(req.body.text)) {
-                simpleConvert(match[1], "metric", slack.getChannelByID(req.body.channel_id));
+            } else if (match = text.match(metricExpression)) {
+                simpleConvert(match[0], "imperial", slack.getChannelByID(req.body.channel_id));
+            } else if (match = text.match(imperialExpression)) {
+                simpleConvert(match[0], "metric", slack.getChannelByID(req.body.channel_id));
             } else if (req.body.text == "") {
                 //TODO scan last few messages for unit expressions
                 res.send("Nothing to convert");

@@ -16,12 +16,12 @@ var wolfram = {
             return;
         }
 
-        var uri = 'http://api.wolframalpha.com/v2/query?input=' + encodeURIComponent(query) + '&primary=true&appid=' + wolfram.token;
+        var uri = 'http://api.wolframalpha.com/v2/query?input=' + encodeURIComponent(query) + '&primary=true&maxwidth=400&width=400&appid=' + wolfram.token;
 
         request(uri, function(error, response, body) {
             if(!error && response.statusCode == 200) {
                 var doc = xml2js.parseString(body, function(err, result) {
-                    console.log(result);
+                    //console.log(result);
                     if (!err) {
                         callback(result.queryresult.$.error == "true", result.queryresult);
                     } else {
