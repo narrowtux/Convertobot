@@ -187,11 +187,14 @@ slack.on("message", function(message) {
 
 setInterval(function () {
     var toRemove = [];
-    messages.forEach(function(key, value) {
-        if (value.time < Date.now() - 60 * 60 * 1000) {
-            toRemove.push(key);
+    for (var key in messages) {
+        if (messages.hasOwnProperty(key)) {
+            var value = messages[key];
+            if (value.time < Date.now() - 60 * 60 * 1000) {
+                toRemove.push(key);
+            }
         }
-    });
+    }
     toRemove.forEach(function(val) {
         delete messages[val];
     });
