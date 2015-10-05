@@ -7,7 +7,7 @@ let config = require("./config.js");
 let bodyParser = require('body-parser');
 let multer = require('multer');
 let express = require("express");
-let wolfram = require("wolfram").createClient(config.wolframAlphaApiKey);
+let wolfram = require("./wolfram.js").withToken(config.wolframAlphaApiKey);
 let Message = require("./message.js");
 
 let logger = new Log("info");
@@ -57,7 +57,7 @@ function simpleConvert(origin, target, channel) {
     msg.send();
     wolfram.query("convert " + origin + " to " + target, function (err, result) {
         if (!err) {
-            msg.text = origin + " = " + result[1].subpods[0].value;
+            msg.text = origin + " = " + result.pod[1].subpod[0].plaintext[0];
             msg.update();
         } else {
             msg.text = "Does not compute";
@@ -100,11 +100,11 @@ function wolframQuery(query, channel, full) {
             if (!full) {
                 attachment.color = "#F58120";
             }
-            attachment.title = pod.title;
-            pod.subpods.forEach(function (subpod) {
-                attachment.image_url = subpod.image;
-                attachment.fallback = subpod.value;
-                if (pod.primary) {
+            attachment.title = pod.$.title;
+            pod.subpod.forEach(function (subpod) {
+                attachment.image_url = subpod.img[0].$.src;
+                attachment.fallback = subpod.plaintext[0];
+                if (pod.$.primary) {
                     attachment.color = "#F58120";
                 }
                 attachments.push(attachment);
@@ -126,15 +126,15 @@ function wolframQuery(query, channel, full) {
 
         if (!err && res) {
             var attachments = [];
-            res.forEach(function(pod) {
-                if (!full && !pod.primary) {
+            res.pod.forEach(function(pod) {
+                if (!full && !pod.$.primary) {
                     return;
                 }
                 addAttachment(pod);
             });
-            if (attachments.length == 0 && res.length >= 2) {
-                addAttachment(res[1]);
-            } else if (res.length == 0) {
+            if (attachments.length == 0 && res.pod.length >= 2) {
+                addAttachment(res.pod[1]);
+            } else if (res.pod.length == 0) {
                 msg.text = "Does not compute";
                 msg.update();
                 return;
