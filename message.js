@@ -7,6 +7,15 @@ class Message {
     constructor(data, slack) {
         this.data = data;
         this.slack = slack;
+        this.data.as_user = true;
+    }
+
+    sendOrUpdate() {
+        if (!this.data.ts) {
+            this.send();
+        } else {
+            this.update();
+        }
     }
 
     send() {
