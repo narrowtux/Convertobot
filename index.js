@@ -172,15 +172,30 @@ slack.on("message", function(message) {
         var msg = new Message({
             channel: message.channel
         }, slack);
-        messages[message.channel + message.ts] = msg;
+        messages[message.channel + message.ts] = {
+            message: msg,
+            time: Date.now()
+        };
         onMessage(message, msg);
     } else if (message.subtype && message.subtype == "message_changed") {
         var msg = messages[message.channel + message.message.ts];
         if (msg) {
-            onMessage(message.message, msg);
+            onMessage(message.message, msg.message);
         }
     }
 });
+
+setInterval(function () {
+    var toRemove = [];
+    messages.forEach(function(key, value) {
+        if (value.time < Date.now() - 60 * 60 * 1000) {
+            toRemove.push(key);
+        }
+    });
+    toRemove.forEach(function(val) {
+        delete messages[val];
+    });
+}, 5 * 60 * 1000);
 
 function onMessage(message, botMessage) {
     let text = message.text;
