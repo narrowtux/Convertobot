@@ -1,6 +1,7 @@
 {
   "name": "converto-bot",
   "version": "0.0.1",
+  "scripts": {"start": "node index.js"},
   "dependencies": {
     "body-parser": "^1.14.1",
     "cloudinary": "^1.2.4",
