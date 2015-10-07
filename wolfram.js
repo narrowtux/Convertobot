@@ -30,7 +30,9 @@ var wolfram = {
                 });
 
             } else {
+                logger.critical("Query '" + query + "' resulted in error:");
                 logger.critical(error);
+                logger.critical(response);
                 return;
             }
         })

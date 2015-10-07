@@ -21,9 +21,15 @@ let metricExpression = _makeExpr(config.metric, "^", "$");
 let imperialExpression = _makeExpr(config.imperial, "^", "$");
 console.log(metricExpression);
 let convertToSyntax = /(.*) to (.*)/;
+var currencies = [];
+config.currencies.forEach(function (l) {
+    currencies.push(makeExpr(l, "`"));
+});
 
 let wolframAlphaQuery = /`=(\+?)([^\`]*)`/g;
 let webapp = express();
+
+const COMPUTING_TEXT = "_Computing …_";
 
 cloudinary.config({
     cloud_name: config.cloudinaryName,
@@ -40,7 +46,7 @@ function _makeExpr(units, prefix, suffix) {
         }
     }
     str += "))" + suffix;
-    return new RegExp(str, "g");
+    return new RegExp(str, "gi");
 }
 function makeExpr(units, fence) {
     return _makeExpr(units, fence, fence);
@@ -52,7 +58,7 @@ slack.on("error", function(err) {
 });
 
 function simpleConvert(origin, target, message) {
-    message.text = "_Computing …_";
+    message.text = COMPUTING_TEXT;
 
     message.sendOrUpdate();
     wolfram.query("convert " + origin + " to " + target, function (err, result) {
@@ -64,6 +70,31 @@ function simpleConvert(origin, target, message) {
         } else {
             message.text = "Does not compute";
             message.update();
+        }
+    });
+}
+
+function multiConvert(origin, targets, message) {
+    message.text = COMPUTING_TEXT;
+
+    message.sendOrUpdate();
+    var target = "";
+    for (var i = 0; i < targets.length; i++) {
+        target += targets[i];
+        if (i < targets.length - 1) {
+            target += ", ";
+        }
+    }
+    wolfram.query("convert " + origin + " to " + target, function(err, result) {
+        if (!err && result && result.pod) {
+            var data = result.pod[1].subpod[0].plaintext[0];
+            message.text = data;
+            message.update();
+        } else {
+            message.text = "Does not compute";
+            message.update();
+            logger.warning(err);
+            logger.warning(result);
         }
     });
 }
@@ -222,10 +253,21 @@ function onMessage(message, botMessage) {
         simpleConvert(res[1], "imperial", botMessage);
     } else if (res = imperialCode.exec(text)) {
         simpleConvert(res[1], "metric", botMessage);
-    } else if (res = wolframAlphaQuery.exec(text)) {
-        if (res && res[2] != "") {
-            wolframQuery(res[2], channel, res[1] == '+', botMessage);
-        }
+    } else if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
+        wolframQuery(res[2], channel, res[1] == '+', botMessage);
+    } else {
+        currencies.forEach(function (expr) {
+            if (res = expr.exec(message.text)) {
+                var index = currencies.indexOf(expr);
+                var other = [];
+                for (var i = 0; i < config.currencies.length; i++) {
+                    if (index != i) {
+                        other.push(config.currencies[i][0]);
+                    }
+                }
+                multiConvert(res[1], other, botMessage);
+            }
+        });
     }
 }
 
