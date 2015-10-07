@@ -163,6 +163,17 @@ function wolframQuery(query, channel, full, message) {
 
 slack.on("open", function() {
     logger.info("ready");
+
+    slack._apiCall("channels.list", {}, function(channels) {
+        if (channels.ok) {
+            logger.info("This bot is not in these channels:");
+            channels.channels.forEach(function (channel) {
+                if (!channel.is_member) {
+                    logger.info(" - #" + channel.name);
+                }
+            });
+        }
+    })
 });
 
 var messages = {};
