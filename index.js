@@ -22,8 +22,10 @@ let imperialExpression = _makeExpr(config.imperial, "^", "$");
 console.log(metricExpression);
 let convertToSyntax = /(.*) to (.*)/;
 var currencies = [];
+var currencyExpressions = [];
 config.currencies.forEach(function (l) {
-    currencies.push(makeExpr(l, "`"));
+    currencies.push(_makeExpr(l, "`", "`", true));
+    currencyExpressions.push(_makeExpr(l, "^", "$", true));
 });
 
 let wolframAlphaQuery = /`=(\+?)([^\`]*)`/g;
@@ -37,17 +39,28 @@ cloudinary.config({
     api_secret: config.cloudinaryApiSecret
 });
 
-function _makeExpr(units, prefix, suffix) {
-    var str = prefix + "([0-9/\\.]*\\s?(";
+function _makeExpr(units, prefix, suffix, both) {
+    var str = prefix;
+    if (both) {
+        str += "(([0-9/\\.]*\\s?)?(";
+    } else {
+        str += "([0-9/\\.]*\\s?(";
+    }
     for (var i = 0; i < units.length; i++) {
-        str += units[i].replace(/\//, "\\/");
+        str += units[i].replace(/\//g, "\\/").replace(/\$/g, "\\$");
         if (i < units.length - 1) {
             str += "|";
         }
     }
-    str += "))" + suffix;
+    if (both) {
+        str += ")\\s?([0-9/\\.]*)?)";
+    } else {
+        str += "))";
+    }
+    str += suffix;
     return new RegExp(str, "gi");
 }
+
 function makeExpr(units, fence) {
     return _makeExpr(units, fence, fence);
 }
@@ -78,17 +91,21 @@ function multiConvert(origin, targets, message) {
     message.text = COMPUTING_TEXT;
 
     message.sendOrUpdate();
-    var target = "";
+    var query = "";
     for (var i = 0; i < targets.length; i++) {
-        target += targets[i];
+        query += "convert " + origin + " to " + targets[i];
         if (i < targets.length - 1) {
-            target += ", ";
+            query += ", ";
         }
     }
-    wolfram.query("convert " + origin + " to " + target, function(err, result) {
+    wolfram.query(query, function(err, result) {
         if (!err && result && result.pod) {
             var data = result.pod[1].subpod[0].plaintext[0];
-            message.text = data;
+            data = data.replace(/\([^\)]+\)/g, "");
+            data = data.replace(/\s{2,}/g, ' ');
+            data = data.replace(/\|/g, '=');
+            data = data.replace(/euro/g, "€");
+            message.text = origin + " = " + data;
             message.update();
         } else {
             message.text = "Does not compute";

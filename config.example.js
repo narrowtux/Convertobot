@@ -60,7 +60,12 @@ var config = {
         'mph', 'm/h',
         'miles per gallon', 'mpg',
         // temperature
-        'F', 'degrees F', '° F', '°F']
+        'F', 'degrees F', '° F', '°F'],
+    currencies: [
+        ["euro", "€", "eur", "euros"],
+        ["usd", "dollars", "dollar", '$'],
+        ["zloty", "zł", "PLN", 'zl']
+    ]
 };
 
 module.exports = config;

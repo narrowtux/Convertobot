@@ -18,6 +18,8 @@ var wolfram = {
 
         var uri = 'http://api.wolframalpha.com/v2/query?input=' + encodeURIComponent(query) + '&primary=true&maxwidth=400&width=400&appid=' + wolfram.token;
 
+        var retries = opts ? opts.retries : 0;
+
         request(uri, function(error, response, body) {
             if(!error && response.statusCode == 200) {
                 var doc = xml2js.parseString(body, function(err, result) {
@@ -33,7 +35,18 @@ var wolfram = {
                 logger.critical("Query '" + query + "' resulted in error:");
                 logger.critical(error);
                 logger.critical(response);
-                return;
+
+                if (retries < 3) {
+                    retries ++;
+                    logger.critical("Retry " + retries + " / 3");
+                    if (!opts) {
+                        opts = {};
+                    }
+                    opts.retries = retries;
+                    wolfram.query(query, callback, opts);
+                } else {
+                    callback(true, null);
+                }
             }
         })
 
