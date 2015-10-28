@@ -30,6 +30,23 @@ class Message {
         this.slack._apiCall("chat.update", data, this._onUpdated.bind(this));
     }
 
+    remove() {
+        var data = {
+            ts: this.data.ts,
+            channel: this.data.channel
+        };
+        console.log("Deleting message");
+        this.slack._apiCall("chat.delete", data, this._onDeleted.bind(this));
+    }
+
+    _onDeleted(data) {
+        if (data.ok) {
+            this.data.deleted = true;
+        } else {
+            console.log(data);
+        }
+    }
+
     set text(text) {
         this.data.text = text;
     }

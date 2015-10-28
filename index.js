@@ -241,6 +241,11 @@ slack.on("message", function(message) {
         if (msg) {
             onMessage(message.message, msg.message);
         }
+    } else if (message.subtype && message.subtype == "message_deleted") {
+        var msg = messages[message.channel + message.deleted_ts];
+        if (msg && msg.message) {
+            msg.message.remove();
+        }
     }
 });
 
