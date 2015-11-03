@@ -138,7 +138,9 @@ slack.on("open", function() {
             });
             if (list.length > 0) {
                 logger.info("This bot is not in these channels:");
-                list.forEach(console.log);
+                list.forEach(function (channel) {
+                    console.log(channel);
+                });
             }
         }
     })
