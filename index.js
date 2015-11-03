@@ -1,43 +1,42 @@
 "use strict";
 
-let Slack = require("slack-client");
+// setup dependencies
 let fs = require("fs");
 let Log = require("log");
-let config = require("./config.js");
+let config = require("config");
 let bodyParser = require('body-parser');
 let multer = require('multer');
 let express = require("express");
-let wolfram = require("./wolfram.js").withToken(config.wolframAlphaApiKey);
+let webapp = express();
 let Message = require("./message.js");
 
 let logger = new Log("info");
-let slack = new Slack(config.slackApiKey, true, true);
+let api = require("./api.js");
 
-let cloudinary = require("cloudinary");
+// setup APIs we use
+let wolfram = api.wolfram;
+let slack = api.slack;
+let cloudinary = api.cloudinary;
+let queries = require("./query.js");
 
-let metricCode = makeExpr(config.metric, "`");
-let imperialCode = makeExpr(config.imperial, "`");
-let metricExpression = _makeExpr(config.metric, "^", "$");
-let imperialExpression = _makeExpr(config.imperial, "^", "$");
-console.log(metricExpression);
+// generate expression to detect usage of units
+let metricCode = makeExpr(config.get("metric"), "`");
+let imperialCode = makeExpr(config.get("imperial"), "`");
+let metricExpression = _makeExpr(config.get("metric"), "^", "$");
+let imperialExpression = _makeExpr(config.get("imperial"), "^", "$");
+
 let convertToSyntax = /(.*) to (.*)/;
 var currencies = [];
 var currencyExpressions = [];
-config.currencies.forEach(function (l) {
+config.get("currencies").forEach(function (l) {
     currencies.push(_makeExpr(l, "`", "`", true));
     currencyExpressions.push(_makeExpr(l, "^", "$", true));
 });
 
 let wolframAlphaQuery = /`=(\+?)([^\`]*)`/g;
-let webapp = express();
 
 const COMPUTING_TEXT = "_Computing …_";
 
-cloudinary.config({
-    cloud_name: config.cloudinaryName,
-    api_key: config.cloudinaryApiKey,
-    api_secret: config.cloudinaryApiSecret
-});
 
 function _makeExpr(units, prefix, suffix, both) {
     var str = prefix;
@@ -70,53 +69,27 @@ slack.on("error", function(err) {
     logger.critical(err);
 });
 
-function simpleConvert(origin, target, message) {
-    message.text = COMPUTING_TEXT;
 
-    message.sendOrUpdate();
-    wolfram.query("convert " + origin + " to " + target, function (err, result) {
-        if (!err && result && result.pod) {
-            var plaintext = result.pod[1].subpod[0].plaintext[0];
-            plaintext = plaintext.replace(/\(.+\)/, "");
-            message.text = origin + " = " + plaintext;
-            message.update();
-        } else {
-            message.text = "Does not compute";
-            message.update();
-        }
-    });
+function simpleConvert(origin, target, message) {
+    multiConvert(origin, [target], message);
 }
 
 function multiConvert(origin, targets, message) {
     message.text = COMPUTING_TEXT;
 
     message.sendOrUpdate();
-    var query = "";
-    for (var i = 0; i < targets.length; i++) {
-        query += "convert " + origin + " to " + targets[i];
-        if (i < targets.length - 1) {
-            query += ", ";
-        }
-    }
-    wolfram.query(query, function(err, result) {
-        if (!err && result && result.pod) {
-            var data = result.pod[1].subpod[0].plaintext[0];
-            data = data.replace(/\([^\)]+\)/g, "");
-            data = data.replace(/\s{2,}/g, ' ');
-            data = data.replace(/\|/g, '=');
-            data = data.replace(/euro/g, "€");
-            message.text = origin + " = " + data;
-            message.update();
+
+    new queries.SimpleConvert(origin, targets).solve(function (msg, atts, error) {
+        if (!error) {
+            message.text = msg;
         } else {
-            message.text = "Does not compute";
-            message.update();
-            logger.warning(err);
-            logger.warning(result);
+            message.text = "Does not compute!";
         }
+        message.update();
     });
 }
 
-function wolframQuery(query, channel, full, message) {
+function wolframQuery(query, full, message) {
     var atts = [];
     if (full) {
         atts.push({
@@ -142,71 +115,14 @@ function wolframQuery(query, channel, full, message) {
     message.attachments = atts;
     message.sendOrUpdate();
 
-    wolfram.query(query, function(err, res) {
-        function addAttachment(pod) {
-            var attachment = {};
-            if (!full) {
-                attachment.color = "#F58120";
-            }
-            attachment.title = pod.$.title;
-            attachment.title_link = "http://www.wolframalpha.com/input/?i=" + encodeURIComponent(query);
-            pod.subpod.forEach(function (subpod) {
-                attachment.image_url = subpod.img[0].$.src;
-                attachment.fallback = subpod.plaintext[0];
-                if (pod.$.primary) {
-                    attachment.color = "#F58120";
-                }
-                attachments.push(attachment);
-                attachment = {}
-            });
-        }
-        function checkDone() {
-            var containsWolfram = false;
-            attachments.forEach(function(attachment) {
-                if (attachment.image_url && attachment.image_url.indexOf("wolframalpha.com") >= 0) {
-                    containsWolfram = true;
-                }
-            });
-            if (!containsWolfram) {
-                message.attachments = attachments;
-                message.update();
-            }
-        }
-
-        if (!err && res && res.pod) {
-            var attachments = [];
-            res.pod.forEach(function(pod) {
-                if (!full && !pod.$.primary) {
-                    return;
-                }
-                addAttachment(pod);
-            });
-            if (attachments.length == 0 && res.pod.length >= 2) {
-                addAttachment(res.pod[1]);
-            } else if (res.pod.length == 0) {
-                message.text = "Does not compute";
-                message.update();
-                return;
-            }
-
-            attachments.forEach(function (attachment) {
-                if (attachment.image_url) {
-                    cloudinary.uploader.upload(attachment.image_url, function(result) {
-                        var i = attachments.indexOf(attachment);
-                        attachments[i].image_url = result.secure_url;
-                        attachments[i].image_width = result.width;
-                        attachments[i].image_height = result.height;
-                        attachments[i].from_url = result.secure_url;
-                        checkDone();
-                    }, {format: "png"});
-                }
-            });
+    new queries.WolframQuery(query, full).solve(function (msg, atts, error) {
+        if (!error) {
+            message.attachments = atts;
         } else {
-            message.text = "Error";
-            message.attachments = null;
-            message.update();
+            message.text = "Does not compute!";
         }
-    });
+        message.update();
+    })
 }
 
 slack.on("open", function() {
@@ -214,12 +130,16 @@ slack.on("open", function() {
 
     slack._apiCall("channels.list", {}, function(channels) {
         if (channels.ok) {
-            logger.info("This bot is not in these channels:");
+            var list = [];
             channels.channels.forEach(function (channel) {
                 if (!channel.is_member) {
-                    logger.info(" - #" + channel.name);
+                    list.push(" - #" + channel.name);
                 }
             });
+            if (list.length > 0) {
+                logger.info("This bot is not in these channels:");
+                list.forEach(console.log);
+            }
         }
     })
 });
@@ -265,6 +185,7 @@ setInterval(function () {
 }, 5 * 60 * 1000);
 
 function onMessage(message, botMessage) {
+    botMessage.data.attachments = [];
     let text = message.text;
     if (!text) {
         return;
@@ -276,7 +197,7 @@ function onMessage(message, botMessage) {
     } else if (res = imperialCode.exec(text)) {
         simpleConvert(res[1], "metric", botMessage);
     } else if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
-        wolframQuery(res[2], channel, res[1] == '+', botMessage);
+        wolframQuery(res[2], res[1] == '+', botMessage);
     } else {
         currencies.forEach(function (expr) {
             if (res = expr.exec(message.text)) {
@@ -300,7 +221,7 @@ webapp.use(bodyParser.urlencoded({ extended: true })); // for parsing applicatio
 
 webapp.post("/slackslash", function(req, res) {
     logger.info("Incoming slackslash");
-    if (req.body.token == config.slackSlashToken) {
+    if (req.body.token == config.get("slackSlashToken")) {
         if (req.body.command == "/convert") {
             var match;
             let text = req.body.text;
@@ -324,5 +245,5 @@ webapp.post("/slackslash", function(req, res) {
     }
 });
 
-var server = webapp.listen(config.slackSlackPort);
+var server = webapp.listen(config.get("slackSlackPort"));
 
