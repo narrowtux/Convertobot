@@ -46,11 +46,13 @@ class SimpleConvert extends Query {
             if (i < this.targetUnits.length - 1) {
                 query += ", ";
             }
+            console.log(query);
         }
 
         wolfram.query(query, function(err, result) {
             if (!err && result && result.pod) {
                 var data = result.pod[1].subpod[0].plaintext[0];
+                console.log(data);
                 data = data.replace(/\([^\)]+\)/g, "");
                 data = data.replace(/\s{2,}/g, ' ');
                 data = data.replace(/\|/g, '=');

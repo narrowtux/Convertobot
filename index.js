@@ -157,12 +157,12 @@ slack.on("message", function(message) {
         };
         onMessage(message, msg);
     } else if (message.subtype && message.subtype == "message_changed") {
-        var msg = messages[message.channel + message.message.ts];
+        msg = messages[message.channel + message.message.ts];
         if (msg) {
             onMessage(message.message, msg.message);
         }
     } else if (message.subtype && message.subtype == "message_deleted") {
-        var msg = messages[message.channel + message.deleted_ts];
+        msg = messages[message.channel + message.deleted_ts];
         if (msg && msg.message) {
             msg.message.remove();
         }
@@ -185,32 +185,99 @@ setInterval(function () {
 }, 5 * 60 * 1000);
 
 function onMessage(message, botMessage) {
-    botMessage.data.attachments = [];
-    let text = message.text;
-    if (!text) {
-        return;
-    }
-    var res;
-    var channel = slack.getChannelByID(message.channel);
-    if (res = metricCode.exec(text)) {
-        simpleConvert(res[1], "imperial", botMessage);
-    } else if (res = imperialCode.exec(text)) {
-        simpleConvert(res[1], "metric", botMessage);
-    } else if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
-        wolframQuery(res[2], res[1] == '+', botMessage);
-    } else {
-        currencies.forEach(function (expr) {
-            if (res = expr.exec(message.text)) {
-                var index = currencies.indexOf(expr);
-                var other = [];
-                for (var i = 0; i < config.currencies.length; i++) {
-                    if (index != i) {
-                        other.push(config.currencies[i][0]);
-                    }
+    function updateMessage() {
+        var texts = [];
+        var attachments = [];
+        for (var i = 0; i < q.length; i++) {
+            if (results[i]) {
+                if (results[i].message) {
+                    texts.push(results[i].message);
                 }
-                multiConvert(res[1], other, botMessage);
+                if (results[i].attachments) {
+                    attachments = attachments.concat(results[i].attachments);
+                }
+                if (results[i].error) {
+                    texts.push(q[i].query + " = Does not compute!");
+                }
+            } else {
+                texts.push(q[i].query + " = " + COMPUTING_TEXT);
             }
-        });
+        }
+
+        var text = "";
+        for (i = 0; i < texts.length; i++) {
+            text += texts[i];
+            if (i < texts.length - 1) {
+                text += "\n";
+            }
+        }
+
+        if (text.length == 0) {
+            text = " ";
+        }
+
+        botMessage.attachments = attachments;
+        botMessage.text = text;
+        botMessage.update();
+    }
+
+    var text = message.text;
+    var query = null;
+
+    var q = [];
+    do {
+        query = null;
+        var res;
+        if (res = metricCode.exec(text)) {
+            query = new queries.SimpleConvert(res[1], ["imperial"]);
+        } else if (res = imperialCode.exec(text)) {
+            query = new queries.SimpleConvert(res[1], ["metric"]);
+        } else if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
+            query = new queries.WolframQuery(res[2], res[1] == "+");
+        } else {
+            currencies.forEach(function (expr) {
+                var resu;
+                if (resu = expr.exec(message.text)) {
+                    var index = currencies.indexOf(expr);
+                    var other = [];
+                    for (var i = 0; i < config.currencies.length; i++) {
+                        if (index != i) {
+                            other.push(config.get("currencies")[i][0]);
+                        }
+                    }
+                    query = new queries.SimpleConvert(resu[1], other);
+                    res = resu;
+                    return false;
+                }
+            });
+        }
+        if (query) {
+            q.push(query);
+            console.log("Found a query " + query.query);
+        }
+    } while (query);
+
+    if (q.length > 0) {
+        var results = [];
+        botMessage.text = COMPUTING_TEXT;
+        botMessage.sendOrUpdate();
+
+        for (var i = 0; i < q.length; i++) {
+            let j = i;
+            query = q[i];
+            query.solve(function(msg, atts, err) {
+                if (!query.full) {
+                    atts[0].text = "Query: `" + query.query + "`";
+                    atts[0].mrkdwn_in = ["text"];
+                }
+                results[j] = {
+                    message: msg,
+                    attachments: atts,
+                    error: err
+                };
+                updateMessage();
+            });
+        }
     }
 }
 
