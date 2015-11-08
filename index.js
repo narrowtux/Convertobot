@@ -268,7 +268,7 @@ function onMessage(message, botMessage) {
             let j = i;
             var query = q[i];
             query.solve(function(msg, atts, err) {
-                if (!query.full && atts.length > 0) {
+                if (!query.full && atts && atts.length > 0) {
                     atts[0].text = "Query: `" + query.query + "`";
                     atts[0].mrkdwn_in = ["text"];
                 }
