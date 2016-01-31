@@ -19,12 +19,8 @@ let slack = api.slack;
 let cloudinary = api.cloudinary;
 let queries = require("./query.js");
 
-// generate expression to detect usage of units
-let metricCode = makeExpr(config.get("metric"), "`");
-let imperialCode = makeExpr(config.get("imperial"), "`");
-let metricExpression = _makeExpr(config.get("metric"), "^", "$");
-let imperialExpression = _makeExpr(config.get("imperial"), "^", "$");
 
+let convertQuerySyntax = /`([^`=]*)`/g;
 let convertToSyntax = /(.*) to (.*)/;
 var currencies = [];
 var currencyExpressions = [];
@@ -232,28 +228,14 @@ function onMessage(message, botMessage) {
     do {
         query = null;
         var res;
-        if (res = metricCode.exec(text)) {
-            query = new queries.SimpleConvert(res[1], ["imperial"]);
-        } else if (res = imperialCode.exec(text)) {
-            query = new queries.SimpleConvert(res[1], ["metric"]);
-        } else if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
+        if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
             query = new queries.WolframQuery(res[2], res[1] == "+");
-        } else {
-            currencies.forEach(function (expr) {
-                var resu;
-                if (resu = expr.exec(message.text)) {
-                    var index = currencies.indexOf(expr);
-                    var other = [];
-                    for (var i = 0; i < config.currencies.length; i++) {
-                        if (index != i) {
-                            other.push(config.get("currencies")[i][0]);
-                        }
-                    }
-                    query = new queries.SimpleConvert(resu[1], other);
-                    res = resu;
-                    return false;
-                }
-            });
+        } else if ((res = convertQuerySyntax.exec(text)) && res) {
+            try {
+                query = new queries.SimpleConvert(res[1]);
+            } catch (e) {
+                query = null;
+            }
         }
         if (query) {
             q.push(query);
@@ -264,7 +246,6 @@ function onMessage(message, botMessage) {
     if (q.length > 0) {
         var results = [];
         botMessage.text = COMPUTING_TEXT;
-        botMessage.sendOrUpdate();
 
         for (var i = 0; i < q.length; i++) {
             let j = i;
@@ -282,6 +263,8 @@ function onMessage(message, botMessage) {
                 updateMessage();
             });
         }
+
+        botMessage.sendOrUpdate();
     }
 }
 

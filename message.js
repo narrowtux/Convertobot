@@ -25,6 +25,9 @@ class Message {
     }
 
     update() {
+        if (!this.data.ts) {
+            return;
+        }
         var data = this.data;
         data.attachments = JSON.stringify(data.attachments);
         this.slack._apiCall("chat.update", data, this._onUpdated.bind(this));

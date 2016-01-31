@@ -2,6 +2,7 @@
 let api = require("./api.js");
 let wolfram = api.wolfram;
 let cloudinary = api.cloudinary;
+let units = require("./units.js");
 
 class Query {
     constructor(query) {
@@ -27,9 +28,12 @@ class Query {
  * Represents a simple conversion
  **/
 class SimpleConvert extends Query {
-    constructor(input, targetUnits) {
+    constructor(input) {
         super(input);
-        this.targetUnits = targetUnits;
+        this.solution = units.getConversions(input);
+        if (this.solution.length === 0) {
+            throw new Error("Nothing to convert");
+        }
     }    
 
     /**
@@ -38,31 +42,7 @@ class SimpleConvert extends Query {
      *                 This query type will only generate a message.
      **/
     solve(callback) {
-        var query = "";
-        var self = this;
-        for (var i = 0; i < this.targetUnits.length; i++) {
-            var unit = this.targetUnits[i];
-            query += "convert " + this.query + " to " + unit;
-            if (i < this.targetUnits.length - 1) {
-                query += ", ";
-            }
-            console.log(query);
-        }
-
-        wolfram.query(query, function(err, result) {
-            if (!err && result && result.pod) {
-                var data = result.pod[1].subpod[0].plaintext[0];
-                console.log(data);
-                data = data.replace(/\([^\)]+\)/g, "");
-                data = data.replace(/\s{2,}/g, ' ');
-                data = data.replace(/\|/g, '=');
-                data = data.replace(/euro/g, "€");
-                var text = self.query + " = " + data;
-                callback(text, [], false);
-            } else {
-                callback(null, null, true);
-            }
-        });
+        callback(this.query + " = " + this.solution.join(" = "), null, null);
     }
 }
 
