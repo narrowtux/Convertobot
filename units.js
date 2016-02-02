@@ -72,10 +72,10 @@ function getConversions(fromUnit) {
         math.unit(fromUnit);
     } catch(e) {
         try {
-            ret.push(math.eval(fromUnit).format());
+            ret.push(math.eval(fromUnit).toString());
         } catch (e) {
-            return ret;
         }
+        return ret;
     }
 
     try {
