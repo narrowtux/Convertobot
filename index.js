@@ -224,24 +224,31 @@ function onMessage(message, botMessage) {
     var text = message.text;
     var query = null;
 
+    var index = 0;
     var q = [];
     do {
+        text = text.substr(index);
         query = null;
         var res;
+        console.log(text);
         if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
             query = new queries.WolframQuery(res[2], res[1] == "+");
+            index = res.lastIndex;
         } else if ((res = convertQuerySyntax.exec(text)) && res) {
-            try {
-                query = new queries.SimpleConvert(res[1]);
-            } catch (e) {
+            query = new queries.SimpleConvert(res[1]);
+            if (query.solution.length == 0) {
                 query = null;
             }
+            index = res.lastIndex;
         }
         if (query) {
             q.push(query);
             console.log("Found a query " + query.query);
         }
-    } while (query);
+    } while (res);
+
+    wolframAlphaQuery.lastIndex = 0;
+    convertQuerySyntax.lastIndex = 0;
 
     if (q.length > 0) {
         var results = [];

@@ -31,9 +31,6 @@ class SimpleConvert extends Query {
     constructor(input) {
         super(input);
         this.solution = units.getConversions(input);
-        if (this.solution.length === 0) {
-            throw new Error("Nothing to convert");
-        }
     }    
 
     /**
