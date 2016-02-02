@@ -59,10 +59,20 @@ function getConversions(fromUnit) {
     var ret = [];
 
     try {
+        var parse = math.parse(fromUnit);
+        if (parse.fn === "to") {
+            ret.push(math.eval(fromUnit).format());
+            return ret;
+        }
+    } catch(e) {
+        return ret;
+    }
+
+    try {
         math.unit(fromUnit);
     } catch(e) {
         try {
-            ret.push(math.eval(fromUnit).toString());
+            ret.push(math.eval(fromUnit).format());
         } catch (e) {
             return ret;
         }
