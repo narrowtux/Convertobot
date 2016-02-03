@@ -59,6 +59,14 @@ function getConversions(fromUnit) {
     //var math2 = require("mathjs");
     var ret = [];
 
+    const replacePass = config.get("replacePass");
+    for (var from in replacePass) {
+        if (replacePass.hasOwnProperty(from)) {
+            var to = replacePass[from];
+            fromUnit = fromUnit.replace(new RegExp(from, 'g'), to);
+        }
+    }
+
     try {
         var parse = math.parse(fromUnit);
         if (parse.fn === "to") {
@@ -166,7 +174,9 @@ function format(scalar, unit, unitFormat) {
 //    "2cm * 4cm",
 //    "1 + 1",
 //    "(1 m + 2 m) * 5 m",
-//    "1 inch * 2 inch"
+//    "1 inch * 2 inch",
+//    "2 ° C",
+//    "10 °F"
 //];
 //
 //test.forEach(expr => {
