@@ -230,7 +230,6 @@ function onMessage(message, botMessage) {
         text = text.substr(index);
         query = null;
         var res;
-        console.log(text);
         if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
             query = new queries.WolframQuery(res[2], res[1] == "+");
             index = res.lastIndex;

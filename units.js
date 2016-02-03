@@ -56,6 +56,7 @@ function getMajorityUnitSystem(units) {
 }
 
 function getConversions(fromUnit) {
+    //var math2 = require("mathjs");
     var ret = [];
 
     try {
@@ -68,24 +69,31 @@ function getConversions(fromUnit) {
         return ret;
     }
 
+    var intermediate = false;
     try {
         math.unit(fromUnit);
     } catch(e) {
-        try {
-            ret.push(math.eval(fromUnit).toString());
-        } catch (e) {
-        }
-        return ret;
+        intermediate = true;
     }
 
     try {
-        fromUnit = math.unit(math.eval(fromUnit));
+        fromUnit = math.eval(fromUnit);
     } catch (e) {
+        return ret;
+    }
+
+    // result is scalar without unit
+    if (!fromUnit.units) {
+        ret.push(fromUnit);
         return ret;
     }
 
     var fromSystem = getMajorityUnitSystem(fromUnit.units.map(unit => unit.unit.name));
     var toSystem;
+
+    if (intermediate) {
+        ret = ret.concat(getFittingConversions(fromUnit, fromSystem));
+    }
 
     if (fromSystem === METRIC) {
         toSystem = IMPERIAL;
@@ -95,12 +103,19 @@ function getConversions(fromUnit) {
         return [];
     }
 
+    ret = ret.concat(getFittingConversions(fromUnit, toSystem));
+
+    return ret;
+}
+
+function getFittingConversions(fromUnit, toSystem) {
+    var ret = [];
     systems[toSystem].forEach(unit => {
         try {
-            var value = fromUnit.toNumber(unit.code);
             if (unit.hidden) {
                 return;
             }
+            var value = fromUnit.toNumber(unit.code);
             if (unit.range) {
                 var lower = unit.range.from || null;
                 var upper = unit.range.to || null;
@@ -112,37 +127,46 @@ function getConversions(fromUnit) {
                     return;
                 }
             }
-            if (unit.round) {
-                value = coolRound(value, unit.round);
-            }
             //ret.push(value + " " + unit.name);
-            ret.push(fromUnit.to(unit.code).format(2));
-        } catch(e) {}
+            ret.push(format(value, {name: unit.code}, unit));
+        } catch(e) {
+        }
     });
     return ret;
 }
 
-var units = {
+function format(scalar, unit, unitFormat) {
+    if (!unitFormat && unit) {
+        unitFormat = getUnitSettings(unit.name);
+    }
+    if (unitFormat) {
+        if (unitFormat.round) {
+            scalar = coolRound(scalar, unitFormat.round);
+        }
 
-};
+        switch (unitFormat.printAs) {
+            case "code":
+                return scalar + " " + unitFormat.code;
+            case "long":
+                if (scalar === 1) {
+                    return scalar + " " + unitFormat.long.singular;
+                } else {
+                    return scalar + " " + unitFormat.long.plural;
+                }
+            default:
+                return scalar + " " + unitFormat.printAs;
+        }
+    } else {
+        return math.round(scalar, 3);
+    }
+}
 
 //var test = [
-//    "3 m",
-//    "1 cm",
-//    "25 cm",
-//    "50 cm",
-//    "1000 m",
-//    "430 m",
-//    "2000 m",
-//    "2m * 4m",
-//    "gibberish",
-//    "13 schrute nickels",
-//    "15 ft",
-//    "2 ft + 5 in",
-//    "130 km/h",
-//    "60 mi/h",
-//    "1 + 3",
-//    "10 degC"
+//    "2 cm",
+//    "2cm * 4cm",
+//    "1 + 1",
+//    "(1 m + 2 m) * 5 m",
+//    "1 inch * 2 inch"
 //];
 //
 //test.forEach(expr => {
@@ -151,6 +175,8 @@ var units = {
 //        console.log(expr + ' = ' + conversions.join(" = "));
 //    }
 //});
+//
+//process.exit();
 
 
 module.exports = {
