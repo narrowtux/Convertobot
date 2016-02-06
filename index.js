@@ -142,32 +142,31 @@ slack.on("open", function() {
             }
         }
     });
-    slack.on("message", function(message) {
-        if (message.text) {
-            var msg = new Message({
-                channel: message.channel
-            }, slack);
-            messages[message.channel + message.ts] = {
-                message: msg,
-                time: Date.now()
-            };
-            onMessage(message, msg);
-        } else if (message.subtype && message.subtype == "message_changed") {
-            msg = messages[message.channel + message.message.ts];
-            if (msg) {
-                onMessage(message.message, msg.message);
-            }
-        } else if (message.subtype && message.subtype == "message_deleted") {
-            msg = messages[message.channel + message.deleted_ts];
-            if (msg && msg.message) {
-                msg.message.remove();
-            }
-        }
-    });
+
 });
 
-
-
+slack.on("message", function(message) {
+    if (message.text) {
+        var msg = new Message({
+            channel: message.channel
+        }, slack);
+        messages[message.channel + message.ts] = {
+            message: msg,
+            time: Date.now()
+        };
+        onMessage(message, msg);
+    } else if (message.subtype && message.subtype == "message_changed") {
+        msg = messages[message.channel + message.message.ts];
+        if (msg) {
+            onMessage(message.message, msg.message);
+        }
+    } else if (message.subtype && message.subtype == "message_deleted") {
+        msg = messages[message.channel + message.deleted_ts];
+        if (msg && msg.message) {
+            msg.message.remove();
+        }
+    }
+});
 
 setInterval(function () {
     var toRemove = [];
