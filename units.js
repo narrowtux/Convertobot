@@ -1,7 +1,7 @@
 "use strict";
 
-let config = require("config");
-let systems = config.get("systems");
+let config = require("./config");
+let systems = config.systems;
 let math = require("mathjs");
 const METRIC = "metric";
 const IMPERIAL = "imperial";
@@ -59,7 +59,7 @@ function getConversions(fromUnit) {
     //var math2 = require("mathjs");
     var ret = [];
 
-    const replacePass = config.get("replacePass");
+    const replacePass = config.replacePass;
     for (var from in replacePass) {
         if (replacePass.hasOwnProperty(from)) {
             var to = replacePass[from];
@@ -97,6 +97,11 @@ function getConversions(fromUnit) {
     }
 
     var fromSystem = getMajorityUnitSystem(fromUnit.units.map(unit => unit.unit.name));
+
+    if (!fromSystem) {
+        ret.push(fromUnit);
+        return ret;
+    }
     var toSystem;
 
     if (intermediate) {
@@ -117,6 +122,9 @@ function getConversions(fromUnit) {
 }
 
 function getFittingConversions(fromUnit, toSystem) {
+    if (!toSystem) {
+        return fromUnit;
+    }
     var ret = [];
     systems[toSystem].forEach(unit => {
         try {
@@ -143,13 +151,25 @@ function getFittingConversions(fromUnit, toSystem) {
     return ret;
 }
 
+function formatNumber(number, maxDigits) {
+    var str = number + '';
+    var dotIndex = str.indexOf('.');
+    if (str.length > (dotIndex + 1 + maxDigits)) {
+        str = str.substr(0, dotIndex + 1 + maxDigits);
+        str = str.replace(/0+$/, '');
+        return str;
+    } else {
+        return str;
+    }
+}
+
 function format(scalar, unit, unitFormat) {
     if (!unitFormat && unit) {
         unitFormat = getUnitSettings(unit.name);
     }
     if (unitFormat) {
         if (unitFormat.round) {
-            scalar = coolRound(scalar, unitFormat.round);
+            scalar = formatNumber(coolRound(scalar, unitFormat.round), 5);
         }
 
         switch (unitFormat.printAs) {
@@ -165,7 +185,7 @@ function format(scalar, unit, unitFormat) {
                 return scalar + " " + unitFormat.printAs;
         }
     } else {
-        return math.round(scalar, 3);
+        return formatNumber(math.round(scalar, 3), 3);
     }
 }
 

@@ -3,7 +3,7 @@
 // setup dependencies
 let fs = require("fs");
 let Log = require("log");
-let config = require("config");
+let config = require("./config");
 let bodyParser = require('body-parser');
 let multer = require('multer');
 let express = require("express");
@@ -24,7 +24,7 @@ let convertQuerySyntax = /`([^`=]*)`/g;
 let convertToSyntax = /(.*) to (.*)/;
 var currencies = [];
 var currencyExpressions = [];
-config.get("currencies").forEach(function (l) {
+config.currencies.forEach(function (l) {
     currencies.push(_makeExpr(l, "`", "`", true));
     currencyExpressions.push(_makeExpr(l, "^", "$", true));
 });
@@ -230,11 +230,21 @@ function onMessage(message, botMessage) {
         query = null;
         var res;
         if ((res = wolframAlphaQuery.exec(text)) && res && res[2] != "") {
-            query = new queries.WolframQuery(res[2], res[1] == "+");
+            try {
+                query = new queries.WolframQuery(res[2], res[1] == "+");
+            } catch (e) {
+                console.error('While parsing', res[1], ':', e);
+                query = null;
+            }
             index = res.lastIndex;
         } else if ((res = convertQuerySyntax.exec(text)) && res) {
-            query = new queries.SimpleConvert(res[1]);
-            if (query.solution.length == 0) {
+            try {
+                query = new queries.SimpleConvert(res[1]);
+                if (query.solution.length == 0) {
+                    query = null;
+                }
+            } catch (e) {
+                console.error('While parsing', res[1], ':', e);
                 query = null;
             }
             index = res.lastIndex;
@@ -280,7 +290,7 @@ webapp.use(bodyParser.urlencoded({ extended: true })); // for parsing applicatio
 
 webapp.post("/slackslash", function(req, res) {
     logger.info("Incoming slackslash");
-    if (req.body.token == config.get("slackSlashToken")) {
+    if (req.body.token == config.slackSlashToken) {
         if (req.body.command == "/convert") {
             var match;
             let text = req.body.text;
@@ -304,5 +314,5 @@ webapp.post("/slackslash", function(req, res) {
     }
 });
 
-var server = webapp.listen(config.get("slackSlackPort"));
+var server = webapp.listen(config.slackSlackPort);
 
