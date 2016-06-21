@@ -314,5 +314,4 @@ webapp.post("/slackslash", function(req, res) {
     }
 });
 
-var server = webapp.listen(config.slackSlackPort);
-
+var server = webapp.listen(config.slackSlashPort);
